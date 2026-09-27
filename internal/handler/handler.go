@@ -5,14 +5,16 @@ import (
 	"net/http"
 
 	api "github.com/Vllad3/tripgo-avito/internal/generated"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
 	api.Unimplemented
+	pool *pgxpool.Pool
 }
 
-func NewHandler() *Handler {
-	return &Handler{}
+func NewHandler(pool *pgxpool.Pool) *Handler {
+	return &Handler{pool: pool}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
@@ -22,7 +24,13 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Ready(w http.ResponseWriter, r *http.Request) {
-	// еще подкрутить unavailable, как появится бд
+	if err := h.pool.Ping(r.Context()); err != nil {
+		if writeErr := writeJSON(w, http.StatusServiceUnavailable, api.HealthResponse{Status: api.Unavailable}); writeErr != nil {
+			http.Error(w, writeErr.Error(), http.StatusInternalServerError)
+		}
+		return
+	}
+
 	if err := writeJSON(w, http.StatusOK, api.HealthResponse{Status: api.Ok}); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}

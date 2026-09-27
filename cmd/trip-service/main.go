@@ -9,6 +9,7 @@ import (
 	"syscall"
 
 	"github.com/Vllad3/tripgo-avito/internal/config"
+	"github.com/Vllad3/tripgo-avito/internal/database"
 	"github.com/Vllad3/tripgo-avito/internal/handler"
 	"github.com/Vllad3/tripgo-avito/internal/httpserver"
 )
@@ -25,7 +26,14 @@ func main() {
 		log.Fatal(err)
 	}
 
-	h := handler.NewHandler()
+	dbPool, err := database.NewPool(ctx, cfg.DatabaseURL, int32(cfg.DatabaseMaxConns), int32(cfg.DatabaseMinConns), cfg.DatabaseMaxConnLifetime, cfg.DatabaseConnectTimeout)
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
+
+	defer dbPool.Close()
+
+	h := handler.NewHandler(dbPool)
 	srv := httpserver.NewServer(cfg.HTTPAddr, h)
 
 	go func() {
