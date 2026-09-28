@@ -9,14 +9,14 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const (
-	readHeaderTimeout = 5 * time.Second
-	readTimeout       = 10 * time.Second
-	writeTimeout      = 15 * time.Second
-	idleTimeout       = 60 * time.Second
-)
+type Timeouts struct {
+	ReadHeader time.Duration
+	Read       time.Duration
+	Write      time.Duration
+	Idle       time.Duration
+}
 
-func NewServer(addr string, h api.ServerInterface) *http.Server {
+func NewServer(addr string, t Timeouts, h api.ServerInterface) *http.Server {
 	r := chi.NewRouter()
 	api.HandlerWithOptions(h, api.ChiServerOptions{
 		BaseRouter:       r,
@@ -26,9 +26,9 @@ func NewServer(addr string, h api.ServerInterface) *http.Server {
 	return &http.Server{
 		Addr:              addr,
 		Handler:           r,
-		ReadHeaderTimeout: readHeaderTimeout,
-		ReadTimeout:       readTimeout,
-		WriteTimeout:      writeTimeout,
-		IdleTimeout:       idleTimeout,
+		ReadHeaderTimeout: t.ReadHeader,
+		ReadTimeout:       t.Read,
+		WriteTimeout:      t.Write,
+		IdleTimeout:       t.Idle,
 	}
 }

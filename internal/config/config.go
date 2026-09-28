@@ -7,20 +7,13 @@ import (
 	"time"
 )
 
-/*
-HTTP_ADDR=:8080
-LOG_LEVEL=info
-SHUTDOWN_TIMEOUT=10s
-DATABASE_URL=postgres://tripgo:tripgo@localhost:21032/tripgo?sslmode=disable
-DATABASE_MAX_CONNS=10
-DATABASE_MIN_CONNS=2
-DATABASE_MAX_CONN_LIFETIME=30m
-DATABASE_CONNECT_TIMEOUT=5s
-DATABASE_QUERY_TIMEOUT=3s
-*/
-
 type Config struct {
-	HTTPAddr        string
+	HTTPAddr              string
+	HTTPReadHeaderTimeout time.Duration
+	HTTPReadTimeout       time.Duration
+	HTTPWriteTimeout      time.Duration
+	HTTPIdleTimeout       time.Duration
+
 	LogLevel        string
 	ShutdownTimeout time.Duration
 
@@ -75,6 +68,26 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	httpReadHeaderTimeout, err := getEnvDurationOrError("HTTP_READ_HEADER_TIMEOUT")
+	if err != nil {
+		return nil, err
+	}
+
+	httpReadTimeout, err := getEnvDurationOrError("HTTP_READ_TIMEOUT")
+	if err != nil {
+		return nil, err
+	}
+
+	httpWriteTimeout, err := getEnvDurationOrError("HTTP_WRITE_TIMEOUT")
+	if err != nil {
+		return nil, err
+	}
+
+	httpIdleTimeout, err := getEnvDurationOrError("HTTP_IDLE_TIMEOUT")
+	if err != nil {
+		return nil, err
+	}
+
 	logLevel, err := getEnvOrError("LOG_LEVEL")
 	if err != nil {
 		return nil, err
@@ -116,9 +129,13 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		HTTPAddr:        httpAddr,
-		LogLevel:        logLevel,
-		ShutdownTimeout: shutdownTimeout,
+		HTTPAddr:              httpAddr,
+		HTTPReadHeaderTimeout: httpReadHeaderTimeout,
+		HTTPReadTimeout:       httpReadTimeout,
+		HTTPWriteTimeout:      httpWriteTimeout,
+		HTTPIdleTimeout:       httpIdleTimeout,
+		LogLevel:              logLevel,
+		ShutdownTimeout:       shutdownTimeout,
 
 		DatabaseURL:             databaseURL,
 		DatabaseMaxConns:        databaseMaxConns,

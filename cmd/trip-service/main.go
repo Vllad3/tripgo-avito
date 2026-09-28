@@ -39,8 +39,13 @@ func main() {
 	trips := repository.NewTripRepository(dbPool, cfg.DatabaseQueryTimeout)
 	history := repository.NewTripStatusHistoryRepository(dbPool, cfg.DatabaseQueryTimeout)
 
-	h := handler.NewHandler(dbPool, txManager, trips, history)
-	srv := httpserver.NewServer(cfg.HTTPAddr, h)
+	h := handler.NewHandler(dbPool, txManager, trips, history, cfg.DatabaseQueryTimeout)
+	srv := httpserver.NewServer(cfg.HTTPAddr, httpserver.Timeouts{
+		ReadHeader: cfg.HTTPReadHeaderTimeout,
+		Read:       cfg.HTTPReadTimeout,
+		Write:      cfg.HTTPWriteTimeout,
+		Idle:       cfg.HTTPIdleTimeout,
+	}, h)
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
