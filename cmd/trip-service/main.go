@@ -35,8 +35,9 @@ func main() {
 	defer dbPool.Close()
 
 	txManager := database.NewTxManager(dbPool)
-	trips := repository.NewTripRepository(dbPool)
-	history := repository.NewTripStatusHistoryRepository(dbPool)
+
+	trips := repository.NewTripRepository(dbPool, cfg.DatabaseQueryTimeout)
+	history := repository.NewTripStatusHistoryRepository(dbPool, cfg.DatabaseQueryTimeout)
 
 	h := handler.NewHandler(dbPool, txManager, trips, history)
 	srv := httpserver.NewServer(cfg.HTTPAddr, h)
@@ -48,11 +49,14 @@ func main() {
 	}()
 
 	<-ctx.Done()
+	log.Println("shutdown signal received")
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("graceful shutdown failed: %v", err)
+	} else {
+		log.Println("server stopped")
 	}
 }

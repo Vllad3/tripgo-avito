@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/Masterminds/squirrel"
 	"github.com/Vllad3/tripgo-avito/internal/database"
@@ -16,14 +17,18 @@ type TripStatusHistoryRepository interface {
 }
 
 type tripStatusHistoryRepository struct {
-	pool *pgxpool.Pool
+	pool         *pgxpool.Pool
+	queryTimeout time.Duration
 }
 
-func NewTripStatusHistoryRepository(pool *pgxpool.Pool) TripStatusHistoryRepository {
-	return &tripStatusHistoryRepository{pool: pool}
+func NewTripStatusHistoryRepository(pool *pgxpool.Pool, queryTimeout time.Duration) TripStatusHistoryRepository {
+	return &tripStatusHistoryRepository{pool: pool, queryTimeout: queryTimeout}
 }
 
 func (r *tripStatusHistoryRepository) Create(ctx context.Context, tripID uuid.UUID, from *domain.TripStatus, to domain.TripStatus, reason *string) error {
+	ctx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
 	query, args, err := squirrel.
 		Insert("trip_status_history").
 		Columns("trip_id", "from_status", "to_status", "reason").

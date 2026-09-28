@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -30,14 +31,18 @@ type TripRepository interface {
 }
 
 type tripRepository struct {
-	pool *pgxpool.Pool
+	pool         *pgxpool.Pool
+	queryTimeout time.Duration
 }
 
-func NewTripRepository(pool *pgxpool.Pool) TripRepository {
-	return &tripRepository{pool: pool}
+func NewTripRepository(pool *pgxpool.Pool, queryTimeout time.Duration) TripRepository {
+	return &tripRepository{pool: pool, queryTimeout: queryTimeout}
 }
 
 func (r *tripRepository) CreateTrip(ctx context.Context, trip *domain.Trip) error {
+	ctx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
 	query, args, err := squirrel.
 		Insert("trips").
 		Columns("id", "user_id", "driver_id", "start_latitude", "start_longitude", "end_latitude", "end_longitude", "price", "status", "started_at", "finished_at").
@@ -60,6 +65,9 @@ func (r *tripRepository) CreateTrip(ctx context.Context, trip *domain.Trip) erro
 }
 
 func (r *tripRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Trip, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
 	query, args, err := squirrel.
 		Select("id", "user_id", "driver_id", "start_latitude", "start_longitude", "end_latitude", "end_longitude", "price", "status", "started_at", "finished_at").
 		From("trips").
@@ -96,6 +104,9 @@ func (r *tripRepository) GetById(ctx context.Context, id uuid.UUID) (*domain.Tri
 }
 
 func (r *tripRepository) Finish(ctx context.Context, id uuid.UUID) error {
+	ctx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
 	query, args, err := squirrel.
 		Update("trips").
 		Set("status", domain.TripStatusCompleted).
@@ -129,6 +140,9 @@ func (r *tripRepository) Finish(ctx context.Context, id uuid.UUID) error {
 }
 
 func (r *tripRepository) existsTrip(ctx context.Context, id uuid.UUID) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, r.queryTimeout)
+	defer cancel()
+
 	query, args, err := squirrel.
 		Select("1").
 		From("trips").
