@@ -40,3 +40,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 		writeProblem(w, r, http.StatusInternalServerError, "internal_error", "Internal error", "Internal server error")
 	}
 }
+
+func InvalidParam(w http.ResponseWriter, r *http.Request, err error) {
+	writeProblem(w, r, http.StatusBadRequest, "invalid_request", "Invalid request", "Invalid path or header parameter")
+}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	api "github.com/Vllad3/tripgo-avito/internal/generated"
+	"github.com/Vllad3/tripgo-avito/internal/handler"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -17,7 +18,10 @@ const (
 
 func NewServer(addr string, h api.ServerInterface) *http.Server {
 	r := chi.NewRouter()
-	api.HandlerFromMux(h, r)
+	api.HandlerWithOptions(h, api.ChiServerOptions{
+		BaseRouter:       r,
+		ErrorHandlerFunc: handler.InvalidParam,
+	})
 
 	return &http.Server{
 		Addr:              addr,

@@ -60,6 +60,48 @@ func (h *Handler) CreateTrip(w http.ResponseWriter, r *http.Request, params api.
 	}
 }
 
+func (h *Handler) GetTrip(w http.ResponseWriter, r *http.Request, tripId api.TripId) {
+	trip, err := h.trips.GetById(r.Context(), tripId)
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	if err := writeJSON(w, http.StatusOK, toAPITrip(trip)); err != nil {
+		log.Printf("write response: %v", err)
+	}
+}
+
+func (h *Handler) FinishTrip(w http.ResponseWriter, r *http.Request, tripId api.TripId) {
+	var trip *domain.Trip
+
+	err := h.tx.Do(r.Context(), func(ctx context.Context) error {
+		if err := h.trips.Finish(ctx, tripId); err != nil {
+			return err
+		}
+
+		from := domain.TripStatusActive
+		if err := h.history.Create(ctx, tripId, &from, domain.TripStatusCompleted, nil); err != nil {
+			return err
+		}
+
+		t, err := h.trips.GetById(ctx, tripId)
+		if err != nil {
+			return err
+		}
+		trip = t
+		return nil
+	})
+	if err != nil {
+		writeError(w, r, err)
+		return
+	}
+
+	if err := writeJSON(w, http.StatusOK, toAPITrip(trip)); err != nil {
+		log.Printf("write response: %v", err)
+	}
+}
+
 func validateTripData(d api.TripData) error {
 	if d.UserId == uuid.Nil {
 		return errors.New("user_id is required")
@@ -90,6 +132,12 @@ func validateCoordinates(field string, c api.Coordinates) error {
 }
 
 func toAPITrip(t *domain.Trip) api.Trip {
+	var finishedAt *time.Time
+	if t.FinishedAt != nil {
+		f := t.FinishedAt.UTC()
+		finishedAt = &f
+	}
+
 	return api.Trip{
 		Id:         t.ID,
 		UserId:     t.UserID,
@@ -98,7 +146,7 @@ func toAPITrip(t *domain.Trip) api.Trip {
 		EndPoint:   api.Coordinates{Latitude: t.EndLatitude, Longitude: t.EndLongitude},
 		Price:      t.Price,
 		Status:     api.TripStatus(t.Status),
-		StartedAt:  t.StartedAt,
-		FinishedAt: t.FinishedAt,
+		StartedAt:  t.StartedAt.UTC(),
+		FinishedAt: finishedAt,
 	}
 }
