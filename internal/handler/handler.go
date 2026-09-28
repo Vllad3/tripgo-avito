@@ -4,17 +4,22 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/Vllad3/tripgo-avito/internal/database"
 	api "github.com/Vllad3/tripgo-avito/internal/generated"
+	"github.com/Vllad3/tripgo-avito/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Handler struct {
 	api.Unimplemented
-	pool *pgxpool.Pool
+	pool    *pgxpool.Pool
+	tx      *database.TxManager
+	trips   repository.TripRepository
+	history repository.TripStatusHistoryRepository
 }
 
-func NewHandler(pool *pgxpool.Pool) *Handler {
-	return &Handler{pool: pool}
+func NewHandler(pool *pgxpool.Pool, tx *database.TxManager, trips repository.TripRepository, history repository.TripStatusHistoryRepository) *Handler {
+	return &Handler{pool: pool, tx: tx, trips: trips, history: history}
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {

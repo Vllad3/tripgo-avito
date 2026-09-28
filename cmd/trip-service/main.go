@@ -12,6 +12,7 @@ import (
 	"github.com/Vllad3/tripgo-avito/internal/database"
 	"github.com/Vllad3/tripgo-avito/internal/handler"
 	"github.com/Vllad3/tripgo-avito/internal/httpserver"
+	"github.com/Vllad3/tripgo-avito/internal/repository"
 )
 
 func main() {
@@ -33,7 +34,11 @@ func main() {
 
 	defer dbPool.Close()
 
-	h := handler.NewHandler(dbPool)
+	txManager := database.NewTxManager(dbPool)
+	trips := repository.NewTripRepository(dbPool)
+	history := repository.NewTripStatusHistoryRepository(dbPool)
+
+	h := handler.NewHandler(dbPool, txManager, trips, history)
 	srv := httpserver.NewServer(cfg.HTTPAddr, h)
 
 	go func() {
