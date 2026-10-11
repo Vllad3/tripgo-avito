@@ -111,6 +111,7 @@ func (r *tripRepository) Finish(ctx context.Context, id uuid.UUID) error {
 		Update("trips").
 		Set("status", domain.TripStatusCompleted).
 		Set("finished_at", squirrel.Expr("NOW()")).
+		Set("updated_at", squirrel.Expr("NOW()")).
 		Where(squirrel.Eq{"id": id}).
 		Where(squirrel.Eq{"status": domain.TripStatusActive}).
 		PlaceholderFormat(squirrel.Dollar).

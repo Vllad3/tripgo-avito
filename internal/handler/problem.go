@@ -44,3 +44,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 func InvalidParam(w http.ResponseWriter, r *http.Request, err error) {
 	writeProblem(w, r, http.StatusBadRequest, "invalid_request", "Invalid request", "Invalid path or header parameter")
 }
+
+func InvalidRequest(w http.ResponseWriter, r *http.Request, detail string) {
+	writeProblem(w, r, http.StatusBadRequest, "invalid_request", "Invalid request", detail)
+}

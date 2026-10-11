@@ -17,6 +17,7 @@ func NewPool(ctx context.Context, databaseURL string, maxConns, minConns int32, 
 	poolCfg.MaxConns = maxConns
 	poolCfg.MinConns = minConns
 	poolCfg.MaxConnLifetime = maxConnLifetime
+	poolCfg.ConnConfig.ConnectTimeout = connectTimeout
 
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {

@@ -34,27 +34,36 @@ func main() {
 
 	defer dbPool.Close()
 
-	txManager := database.NewTxManager(dbPool)
+	txManager := database.NewTxManager(dbPool, cfg.DatabaseQueryTimeout)
 
 	trips := repository.NewTripRepository(dbPool, cfg.DatabaseQueryTimeout)
 	history := repository.NewTripStatusHistoryRepository(dbPool, cfg.DatabaseQueryTimeout)
 
 	h := handler.NewHandler(dbPool, txManager, trips, history, cfg.DatabaseQueryTimeout)
-	srv := httpserver.NewServer(cfg.HTTPAddr, httpserver.Timeouts{
+	srv, err := httpserver.NewServer(cfg.HTTPAddr, httpserver.Timeouts{
 		ReadHeader: cfg.HTTPReadHeaderTimeout,
 		Read:       cfg.HTTPReadTimeout,
 		Write:      cfg.HTTPWriteTimeout,
 		Idle:       cfg.HTTPIdleTimeout,
 	}, h)
 
+	if err != nil {
+		log.Fatalf("http server: %v", err)
+	}
+
+	serverErr := make(chan error, 1)
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatal(err)
+			serverErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	log.Println("shutdown signal received")
+	select {
+	case <-ctx.Done():
+		log.Println("shutdown signal received")
+	case err := <-serverErr:
+		log.Printf("http server: %v", err)
+	}
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
 	defer cancel()

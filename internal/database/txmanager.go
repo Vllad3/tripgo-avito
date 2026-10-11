@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -18,16 +19,13 @@ type Executor interface {
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 }
 
-type txManager interface {
-	Do(ctx context.Context, fn func(ctx context.Context) error) error
-}
-
 type TxManager struct {
-	pool *pgxpool.Pool
+	pool    *pgxpool.Pool
+	timeout time.Duration
 }
 
-func NewTxManager(pool *pgxpool.Pool) *TxManager {
-	return &TxManager{pool: pool}
+func NewTxManager(pool *pgxpool.Pool, timeout time.Duration) *TxManager {
+	return &TxManager{pool: pool, timeout: timeout}
 }
 
 func (tm *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error) error {
@@ -41,7 +39,9 @@ func (tm *TxManager) Do(ctx context.Context, fn func(ctx context.Context) error)
 	}
 
 	rollback := func() error {
-		return tx.Rollback(context.WithoutCancel(ctx))
+		rbCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), tm.timeout)
+		defer cancel()
+		return tx.Rollback(rbCtx)
 	}
 
 	defer func() {
