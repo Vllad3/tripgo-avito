@@ -2,6 +2,7 @@
 .env
 .tripgo/
 trip.json
+coverage.out
 
 # Сборка
 bin/

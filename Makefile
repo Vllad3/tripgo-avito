@@ -2,13 +2,17 @@ include .env.example
 -include .env
 export
 
-.PHONY: run generate migrate migrate-down test lint
+.PHONY: run generate migrate migrate-down test lint test-integration
 
 run:
 	go run ./cmd/trip-service
 
 test:
-	go test -race ./...
+	go test -race -coverprofile=coverage.out ./...
+	@go tool cover -func=coverage.out | tail -n 1
+
+test-integration:
+	go test -race -count=1 -tags=integration ./internal/repository/...
 
 generate:
 	go tool oapi-codegen \
