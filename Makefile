@@ -2,7 +2,7 @@ include .env.example
 -include .env
 export
 
-.PHONY: run generate migrate migrate-down test
+.PHONY: run generate migrate migrate-down test lint
 
 run:
 	go run ./cmd/trip-service
@@ -17,9 +17,13 @@ generate:
 		-package api \
 		-o internal/generated/api.gen.go \
 		contracts/openapi/trip-service.openapi.yaml
+	go generate ./...
 
 migrate:
 	@GOOSE_DRIVER=postgres GOOSE_DBSTRING="$(DATABASE_URL)" go tool goose -dir migrations up
 
 migrate-down:
 	@GOOSE_DRIVER=postgres GOOSE_DBSTRING="$(DATABASE_URL)" go tool goose -dir migrations down
+
+lint:
+	@golangci-lint run ./...
