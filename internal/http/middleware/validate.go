@@ -1,4 +1,4 @@
-package httpserver
+package middleware
 
 import (
 	"fmt"
@@ -8,10 +8,13 @@ import (
 	"github.com/getkin/kin-openapi/openapi3filter"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
-	"github.com/Vllad3/tripgo-avito/internal/handler"
+	"github.com/Vllad3/tripgo-avito/internal/http/domainerror"
 )
 
-func requestValidator(spec *openapi3.T) (func(http.Handler) http.Handler, error) {
+func ValidateRequest(spec *openapi3.T) (func(http.Handler) http.Handler, error) {
+	spec.Servers = nil
+	openapi3.SchemaErrorDetailsDisabled = true
+
 	router, err := gorillamux.NewRouter(spec)
 	if err != nil {
 		return nil, fmt.Errorf("build openapi router: %w", err)
@@ -31,7 +34,8 @@ func requestValidator(spec *openapi3.T) (func(http.Handler) http.Handler, error)
 				Route:      route,
 			}
 			if err := openapi3filter.ValidateRequest(r.Context(), input); err != nil {
-				handler.InvalidRequest(w, r, err.Error())
+				status, body := domainerror.InvalidRequest(err.Error())
+				domainerror.Write(w, r, status, body)
 				return
 			}
 
