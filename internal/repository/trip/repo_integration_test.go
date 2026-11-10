@@ -33,7 +33,13 @@ func newEnv(t *testing.T) *env {
 		t.Fatal("DATABASE_URL is not set: run `tripgoctl environment start` and `make migrate`")
 	}
 
-	pool, err := postgres.NewPool(context.Background(), url, 10, 2, 30*time.Minute, 5*time.Second)
+	pool, err := postgres.NewPool(context.Background(), postgres.Config{
+		URL:             url,
+		MaxConns:        10,
+		MinConns:        2,
+		MaxConnLifetime: 30 * time.Minute,
+		ConnectTimeout:  5 * time.Second,
+	}, nil, nil)
 	if err != nil {
 		t.Fatalf("connect to database: %v", err)
 	}

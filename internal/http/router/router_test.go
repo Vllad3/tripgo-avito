@@ -1,6 +1,7 @@
 package router_test
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -10,6 +11,9 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"go.opentelemetry.io/otel/metric/noop"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	api "github.com/Vllad3/tripgo-avito/internal/generated"
 	"github.com/Vllad3/tripgo-avito/internal/http/router"
@@ -59,13 +63,29 @@ type env struct {
 	get    *fakeTrip
 	finish *fakeTrip
 	health *fakeHealth
+	spans  *tracetest.InMemoryExporter
 }
 
 func newEnv(t *testing.T) *env {
 	t.Helper()
 
-	e := &env{create: &fakeCreate{}, get: &fakeTrip{}, finish: &fakeTrip{}, health: &fakeHealth{}}
-	h, err := router.New(e.create, e.get, e.finish, e.health, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	spans := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(sdktrace.WithSyncer(spans))
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	meter := noop.NewMeterProvider().Meter("test")
+	reqDur, _ := meter.Float64Histogram("req")
+	active, _ := meter.Int64UpDownCounter("active")
+
+	e := &env{
+		create: &fakeCreate{}, get: &fakeTrip{}, finish: &fakeTrip{}, health: &fakeHealth{}, spans: spans,
+	}
+	h, err := router.New(e.create, e.get, e.finish, e.health, router.Options{
+		Log:             slog.New(slog.NewTextHandler(io.Discard, nil)),
+		TracerProvider:  tp,
+		RequestDuration: reqDur,
+		ActiveRequests:  active,
+	})
 	if err != nil {
 		t.Fatalf("build router: %v", err)
 	}
@@ -165,5 +185,31 @@ func TestRouter_PanicInHandlerDoesNotKillService(t *testing.T) {
 
 	if rec := e.do(http.MethodGet, "/health", ""); rec.Code != http.StatusOK {
 		t.Errorf("health after panic: status = %d, want 200", rec.Code)
+	}
+}
+
+func TestRouter_SpanNamesUseRouteTemplate(t *testing.T) {
+	e := newEnv(t)
+
+	e.do(http.MethodGet, tripPath, "")
+	e.do(http.MethodPost, tripPath+"/finish", "")
+	e.do(http.MethodGet, "/health", "")
+	e.do(http.MethodGet, "/api/v1/unknown", "")
+
+	want := []string{
+		"GET /api/v1/trips/{tripId}",
+		"POST /api/v1/trips/{tripId}/finish",
+		"GET /health",
+		"GET unmatched",
+	}
+
+	spans := e.spans.GetSpans()
+	if len(spans) != len(want) {
+		t.Fatalf("spans = %d, want %d", len(spans), len(want))
+	}
+	for i, span := range spans {
+		if span.Name != want[i] {
+			t.Errorf("span %d name = %q, want %q", i, span.Name, want[i])
+		}
 	}
 }

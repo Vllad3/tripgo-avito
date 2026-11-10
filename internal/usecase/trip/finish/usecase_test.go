@@ -3,6 +3,8 @@ package finish_test
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -34,6 +36,7 @@ type fixture struct {
 	trips   *MocktripRepository
 	history *MockhistoryRepository
 	tx      *MocktxManager
+	metrics *Mockmetrics
 	uc      *finish.UseCase
 }
 
@@ -45,8 +48,13 @@ func newFixture(t *testing.T) *fixture {
 		trips:   NewMocktripRepository(ctrl),
 		history: NewMockhistoryRepository(ctrl),
 		tx:      NewMocktxManager(ctrl),
+		metrics: NewMockmetrics(ctrl),
 	}
-	f.uc = finish.New(f.trips, f.history, f.tx, func() time.Time { return finishedAt })
+	f.uc = finish.New(f.trips, f.history, f.tx,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		f.metrics,
+		func() time.Time { return finishedAt },
+	)
 	return f
 }
 
@@ -65,6 +73,7 @@ func TestUseCase_Execute_Success(t *testing.T) {
 		},
 	)
 	f.history.EXPECT().Add(gomock.Any(), tripID, &from, trip.StatusCompleted).Return(nil)
+	f.metrics.EXPECT().TripCompleted(gomock.Any())
 
 	got, err := f.uc.Execute(context.Background(), tripID)
 	if err != nil {
@@ -111,7 +120,7 @@ func TestUseCase_Execute_AlreadyCompleted(t *testing.T) {
 	if got != nil {
 		t.Errorf("trip = %+v, want nil on error", got)
 	}
-	if !done.FinishedAt.Equal(startedAt.Add(time.Minute)) {
+	if done.FinishedAt == nil || !done.FinishedAt.Equal(startedAt.Add(time.Minute)) {
 		t.Errorf("finished_at = %v, must not be overwritten", done.FinishedAt)
 	}
 }
@@ -122,7 +131,6 @@ func TestUseCase_Execute_UpdateFails(t *testing.T) {
 	runInTx(f.tx)
 	f.trips.EXPECT().GetForUpdate(gomock.Any(), tripID).Return(activeTrip(), nil)
 	f.trips.EXPECT().Update(gomock.Any(), gomock.Any()).Return(errDB)
-	// history.Add не ожидается
 
 	_, err := f.uc.Execute(context.Background(), tripID)
 	if !errors.Is(err, errDB) {

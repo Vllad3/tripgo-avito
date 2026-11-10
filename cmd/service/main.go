@@ -40,7 +40,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer c.Close()
+	defer func() {
+		closeCtx, cancel := context.WithTimeout(context.Background(), cfg.ShutdownTimeout)
+		defer cancel()
+		c.Close(closeCtx)
+	}()
 
 	srv := c.Server()
 

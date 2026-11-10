@@ -6,18 +6,27 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 
 	api "github.com/Vllad3/tripgo-avito/internal/generated"
 	"github.com/Vllad3/tripgo-avito/internal/http/domainerror"
 	"github.com/Vllad3/tripgo-avito/internal/http/middleware"
 )
 
+type Options struct {
+	Log             *slog.Logger
+	TracerProvider  trace.TracerProvider
+	RequestDuration metric.Float64Histogram
+	ActiveRequests  metric.Int64UpDownCounter
+}
+
 func New(
 	create createHandler,
 	get getHandler,
 	finish finishHandler,
 	health healthHandler,
-	log *slog.Logger,
+	opts Options,
 ) (http.Handler, error) {
 	spec, err := api.GetSpec()
 	if err != nil {
@@ -30,14 +39,35 @@ func New(
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.Recover(log), validate)
+	resolver := routeResolver(r)
 
-	api.HandlerWithOptions(&server{create: create, get: get, finish: finish, health: health}, api.ChiServerOptions{
-		BaseRouter:       r,
-		ErrorHandlerFunc: invalidParam,
-	})
+	r.Use(
+		middleware.Recover(opts.Log),
+		middleware.Tracing(opts.TracerProvider, resolver),
+		middleware.Logging(opts.Log, resolver),
+		middleware.Metrics(opts.RequestDuration, opts.ActiveRequests, resolver),
+		validate,
+	)
+
+	api.HandlerWithOptions(
+		&server{create: create, get: get, finish: finish, health: health},
+		api.ChiServerOptions{
+			BaseRouter:       r,
+			ErrorHandlerFunc: invalidParam,
+		},
+	)
 
 	return r, nil
+}
+
+func routeResolver(mux *chi.Mux) func(*http.Request) string {
+	return func(r *http.Request) string {
+		rctx := chi.NewRouteContext()
+		if !mux.Match(rctx, r.Method, r.URL.Path) {
+			return "unmatched"
+		}
+		return rctx.RoutePattern()
+	}
 }
 
 func invalidParam(w http.ResponseWriter, r *http.Request, _ error) {
@@ -58,12 +88,12 @@ func (s *server) CreateTrip(w http.ResponseWriter, r *http.Request, _ api.Create
 	s.create.Handle(w, r)
 }
 
-func (s *server) GetTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
-	s.get.Handle(w, r, tripID)
+func (s *server) GetTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	s.get.Handle(w, r, id)
 }
 
-func (s *server) FinishTrip(w http.ResponseWriter, r *http.Request, tripID api.TripId) {
-	s.finish.Handle(w, r, tripID)
+func (s *server) FinishTrip(w http.ResponseWriter, r *http.Request, id api.TripId) {
+	s.finish.Handle(w, r, id)
 }
 
 func (s *server) Health(w http.ResponseWriter, r *http.Request) {

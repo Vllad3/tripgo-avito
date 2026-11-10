@@ -3,6 +3,7 @@ package create
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +23,8 @@ type UseCase struct {
 	trips   tripRepository
 	history historyRepository
 	tx      txManager
+	log     *slog.Logger
+	metrics metrics
 	now     func() time.Time
 	newID   func() uuid.UUID
 }
@@ -30,10 +33,20 @@ func New(
 	trips tripRepository,
 	history historyRepository,
 	tx txManager,
+	log *slog.Logger,
+	metrics metrics,
 	now func() time.Time,
 	newID func() uuid.UUID,
 ) *UseCase {
-	return &UseCase{trips: trips, history: history, tx: tx, now: now, newID: newID}
+	return &UseCase{
+		trips:   trips,
+		history: history,
+		tx:      tx,
+		log:     log,
+		metrics: metrics,
+		now:     now,
+		newID:   newID,
+	}
 }
 
 func (u *UseCase) Execute(ctx context.Context, in Input) (*trip.Trip, error) {
@@ -51,6 +64,13 @@ func (u *UseCase) Execute(ctx context.Context, in Input) (*trip.Trip, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create trip: %w", err)
 	}
+
+	u.metrics.TripCreated(ctx)
+	u.log.InfoContext(ctx, "trip created",
+		slog.String("trip_id", t.ID.String()),
+		slog.String("user_id", t.UserID.String()),
+		slog.String("driver_id", t.DriverID.String()),
+	)
 
 	return t, nil
 }

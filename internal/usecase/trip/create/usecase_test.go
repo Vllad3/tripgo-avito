@@ -3,6 +3,8 @@ package create_test
 import (
 	"context"
 	"errors"
+	"io"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -52,6 +54,7 @@ type fixture struct {
 	trips   *MocktripRepository
 	history *MockhistoryRepository
 	tx      *MocktxManager
+	metrics *Mockmetrics
 	uc      *create.UseCase
 }
 
@@ -63,8 +66,11 @@ func newFixture(t *testing.T) *fixture {
 		trips:   NewMocktripRepository(ctrl),
 		history: NewMockhistoryRepository(ctrl),
 		tx:      NewMocktxManager(ctrl),
+		metrics: NewMockmetrics(ctrl),
 	}
 	f.uc = create.New(f.trips, f.history, f.tx,
+		slog.New(slog.NewTextHandler(io.Discard, nil)),
+		f.metrics,
 		func() time.Time { return now },
 		func() uuid.UUID { return tripID },
 	)
@@ -78,6 +84,7 @@ func TestUseCase_Execute_Success(t *testing.T) {
 	runInTx(f.tx)
 	f.trips.EXPECT().Save(gomock.Any(), wantTrip(in)).Return(nil)
 	f.history.EXPECT().Add(gomock.Any(), tripID, gomock.Nil(), trip.StatusActive).Return(nil)
+	f.metrics.EXPECT().TripCreated(gomock.Any())
 
 	got, err := f.uc.Execute(context.Background(), in)
 	if err != nil {

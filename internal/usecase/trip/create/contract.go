@@ -22,4 +22,9 @@ type (
 	txManager interface {
 		Do(ctx context.Context, fn func(ctx context.Context) error) error
 	}
+
+	// metrics — минимальный интерфейс потребителя. Реализация в infra/telemetry.
+	metrics interface {
+		TripCreated(ctx context.Context)
+	}
 )
