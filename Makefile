@@ -5,7 +5,7 @@ export
 .PHONY: run generate migrate migrate-down test lint test-integration
 
 run:
-	go run ./cmd/trip-service
+	go run ./cmd/service
 
 test:
 	go test -race -coverprofile=coverage.out ./...
@@ -30,4 +30,4 @@ migrate-down:
 	@GOOSE_DRIVER=postgres GOOSE_DBSTRING="$(DATABASE_URL)" go tool goose -dir migrations down
 
 lint:
-	@golangci-lint run ./...
+	@golangci-lint run --build-tags integration ./...
