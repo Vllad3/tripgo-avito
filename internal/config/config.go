@@ -18,8 +18,8 @@ type Config struct {
 	ShutdownTimeout time.Duration
 
 	DatabaseURL             string
-	DatabaseMaxConns        int
-	DatabaseMinConns        int
+	DatabaseMaxConns        int32
+	DatabaseMinConns        int32
 	DatabaseMaxConnLifetime time.Duration
 	DatabaseConnectTimeout  time.Duration
 	DatabaseQueryTimeout    time.Duration
@@ -50,16 +50,21 @@ func getEnvDurationOrError(key string) (time.Duration, error) {
 	return duration, nil
 }
 
-func getEnvIntOrError(key string) (int, error) {
+func getEnvPositiveInt32OrError(key string) (int32, error) {
 	value, err := getEnvOrError(key)
 	if err != nil {
 		return 0, err
 	}
-	intValue, err := strconv.Atoi(value)
+
+	n, err := strconv.ParseInt(value, 10, 32)
 	if err != nil {
-		return 0, fmt.Errorf("invalid %s: %v", key, err)
+		return 0, fmt.Errorf("invalid %s: %w", key, err)
 	}
-	return intValue, nil
+	if n <= 0 {
+		return 0, fmt.Errorf("%s must be greater than 0", key)
+	}
+
+	return int32(n), nil
 }
 
 func Load() (*Config, error) {
@@ -103,14 +108,20 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	databaseMaxConns, err := getEnvIntOrError("DATABASE_MAX_CONNS")
+	databaseMaxConns, err := getEnvPositiveInt32OrError("DATABASE_MAX_CONNS")
 	if err != nil {
 		return nil, err
 	}
 
-	databaseMinConns, err := getEnvIntOrError("DATABASE_MIN_CONNS")
+	databaseMinConns, err := getEnvPositiveInt32OrError("DATABASE_MIN_CONNS")
 	if err != nil {
 		return nil, err
+	}
+	if databaseMinConns > databaseMaxConns {
+		return nil, fmt.Errorf(
+			"DATABASE_MIN_CONNS (%d) must not exceed DATABASE_MAX_CONNS (%d)",
+			databaseMinConns, databaseMaxConns,
+		)
 	}
 
 	databaseMaxConnLifetime, err := getEnvDurationOrError("DATABASE_MAX_CONN_LIFETIME")
