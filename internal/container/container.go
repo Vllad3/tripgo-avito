@@ -27,8 +27,6 @@ import (
 	getuc "github.com/Vllad3/tripgo-avito/internal/usecase/trip/get"
 )
 
-// Container создаёт все зависимости и связывает их между собой.
-// Это единственное место, где встречаются конкретные реализации.
 type Container struct {
 	log    *slog.Logger
 	tel    *telemetry.Telemetry

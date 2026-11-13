@@ -34,7 +34,7 @@ func TestNew(t *testing.T) {
 	tests := []struct {
 		name      string
 		mutate    func(*args)
-		wantField string // пусто: ожидаем успех
+		wantField string
 	}{
 		{name: "valid"},
 		{name: "zero price is allowed", mutate: func(a *args) { a.price = 0 }},
